@@ -5,7 +5,7 @@ for chatting with the agent from the terminal.
 
 Usage:
     export DASHSCOPE_API_KEY=your_key
-    babi                          # default workspace ~/babi-python-workspace
+    babi                          # default workspace ~/babi-agentscope-workspace
     babi --workspace ~/my-project
 """
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--workspace",
     default=None,
-    help="Workspace directory (default: ~/babi-python-workspace)",
+    help="Workspace directory (default: ~/babi-agentscope-workspace)",
 )
 @click.option(
     "--model",

@@ -37,7 +37,7 @@ export GITHUB_TOKEN=your_github_token
 
 ```bash
 # 克隆项目
-git clone <repo-url> && cd babi-python
+git clone <repo-url> && cd babi-agentscope
 
 # 创建虚拟环境（推荐）
 python -m venv .venv
@@ -52,7 +52,7 @@ pip install -e ".[dev]"
 ### 命令行模式（默认）
 
 ```bash
-babi                            # 默认工作目录 ~/babi-python-workspace
+babi                            # 默认工作目录 ~/babi-agentscope-workspace
 babi --workspace ~/my-project   # 指定工作目录
 babi --model qwen-max           # 指定模型
 babi -v                         # 开启详细日志
@@ -82,7 +82,7 @@ babi --web --port 9000          # 指定端口
 | `GITHUB_TOKEN` | GitHub 个人访问令牌 | — |
 | `BABI_MODEL_NAME` | 模型名称 | `qwen-plus` |
 | `BABI_FALLBACK_MODEL` | 降级模型 | `qwen-turbo` |
-| `BABI_WORKSPACE` | 工作目录 | `~/babi-python-workspace` |
+| `BABI_WORKSPACE` | 工作目录 | `~/babi-agentscope-workspace` |
 | `BABI_HOST` | Web 服务地址 | `127.0.0.1` |
 | `BABI_PORT` | Web 服务端口 | `8900` |
 
@@ -114,7 +114,7 @@ description: Perform structured code review on source files
 ## 项目结构
 
 ```
-babi-python/
+babi-agentscope/
 ├── babi/
 │   ├── agent/          # Agent 构建与 Prompt 管理
 │   ├── middleware/      # 上下文截断等中间件

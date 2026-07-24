@@ -1,5 +1,5 @@
 [project]
-name = "babi-python"
+name = "babi-agentscope"
 version = "1.0.0"
 description = "A coding agent application built with AgentScope Python"
 requires-python = ">=3.10"

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     port: int = 8900
 
     # --- Workspace ---
-    workspace: str = "~/babi-python-workspace"
+    workspace: str = "~/babi-agentscope-workspace"
 
     # --- Model ---
     model_name: str = "qwen-plus"
