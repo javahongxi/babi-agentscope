@@ -60,13 +60,14 @@ def main(workspace: str | None, model: str | None, host: str | None, port: int |
 
     Run in CLI mode (default) or start a web server with --web.
     """
-    # Configure logging
+    # Configure logging — only for babi package, suppress noisy third-party loggers
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=log_level,
+        level=logging.WARNING,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    logging.getLogger("babi").setLevel(log_level)
 
     settings = get_settings()
 
@@ -126,7 +127,7 @@ async def _cli_repl(settings) -> None:
     print("=" * 60)
     print(f"Workspace: {workspace_path}")
     print("Built-in tools: read_file, write_file, edit_file, grep_files, execute")
-    print("Custom tools: fetch_url, http_request, github_api_request, github_pinned_repos, list_skills, use_skill")
+    print("Custom tools: fetch_url, http_request, web_search, github_api_request, github_pinned_repos, list_skills, use_skill")
     print("Type 'exit' to quit.")
     print()
 
@@ -159,7 +160,7 @@ async def _cli_repl(settings) -> None:
                     case EventType.TEXT_BLOCK_DELTA:
                         print(evt.delta, end="", flush=True)
                     case EventType.TOOL_CALL_START:
-                        print(f"\n  [Tool: {evt.tool_name}]", end="", flush=True)
+                        print(f"\n  [Tool: {evt.tool_call_name}]", end="", flush=True)
                     case EventType.TOOL_CALL_END:
                         pass
                     case _:

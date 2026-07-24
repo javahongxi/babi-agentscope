@@ -16,6 +16,7 @@ from babi.tools.fetch_url import fetch_url
 from babi.tools.github_api import github_api_request, github_pinned_repos
 from babi.tools.http_request import http_request
 from babi.tools.skill_tool import SkillTool
+from babi.tools.web_search import web_search
 from babi.utils.helpers import AGENT_NAME, init_agents_md, resolve_workspace
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
             Edit(),
             FunctionTool(fetch_url),
             FunctionTool(http_request),
+            FunctionTool(web_search),
             FunctionTool(github_api_request),
             FunctionTool(github_pinned_repos),
             FunctionTool(skill_tool.list_skills),
@@ -73,7 +75,7 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
 
     logger.info(
         "Registered tools: read_file, write_file, edit_file, grep_files, execute, "
-        "fetch_url, http_request, github_api_request, github_pinned_repos, list_skills, use_skill"
+        "fetch_url, http_request, web_search, github_api_request, github_pinned_repos, list_skills, use_skill"
     )
 
     # Build the agent with BYPASS permission mode to auto-approve all tool calls

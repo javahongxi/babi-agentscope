@@ -132,7 +132,17 @@ def _guidelines_section() -> str:
   generate or obtain an image URL (from skills like image generation, or any
   tool that returns image URLs), you MUST use Markdown image syntax
   ![description](image_url) so the image is displayed directly in the chat.
-  Do NOT output bare URLs — always wrap them in Markdown image syntax."""
+  Do NOT output bare URLs — always wrap them in Markdown image syntax.
+
+NETWORK ACCESS RULES (IMPORTANT):
+- PREFER Chinese domestic services over foreign ones, as foreign services may be
+  inaccessible from mainland China. For example:
+  - Movie info: Use 豆瓣 (douban.com), 猫眼 (maoyan.com) instead of TMDb, IMDb
+  - Search: Use 百度, 必应中国 instead of Google
+  - Maps: Use 高德, 百度地图 instead of Google Maps
+- If a foreign service returns an error or timeout, immediately fallback to a
+  Chinese domestic alternative without retrying.
+- When using web_search, include Chinese keywords for better results."""
 
 
 def _load_custom_instructions() -> str:
