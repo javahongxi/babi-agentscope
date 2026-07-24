@@ -51,11 +51,11 @@ def _build_extra_tool_factory(settings: Settings):
     return factory
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(workspace_path: Path | None = None) -> str:
     """Build the babi system prompt with skills."""
     skill_tool = SkillTool()
     skills_list = list(skill_tool.skills.values())
-    return build_system_prompt(skills_list)
+    return build_system_prompt(skills_list, workspace_path=workspace_path)
 
 
 def create_babi_app(settings: Settings):
@@ -75,11 +75,12 @@ def create_babi_app(settings: Settings):
     from fastapi.middleware import Middleware
     from fastapi.middleware.cors import CORSMiddleware
 
-    from babi.utils.helpers import resolve_workspace
+    from babi.utils.helpers import resolve_workspace, init_agents_md
 
     # Resolve workspace path
     workspace_path = resolve_workspace(settings.workspace)
     workspace_path.mkdir(parents=True, exist_ok=True)
+    init_agents_md(workspace_path)
 
     # Storage: Redis
     storage = RedisStorage(host="localhost", port=6379)
@@ -87,8 +88,66 @@ def create_babi_app(settings: Settings):
     # Message bus: in-memory (single process)
     message_bus = InMemoryMessageBus()
 
-    # Workspace manager: local filesystem
-    workspace_manager = LocalWorkspaceManager(
+    # Workspace manager: use basedir directly (no agent_id subdirectory),
+    # matching the Java version's flat workspace layout.
+    class _FlatWorkspaceManager(LocalWorkspaceManager):
+        """LocalWorkspaceManager that uses basedir directly as workdir.
+
+        Babi is single-agent, so we skip the per-agent subdirectory
+        (e.g. basedir/d7a39143054848a6bc6ab419a1457fb7) and share one
+        workspace directory — same as the Java version.
+        """
+
+        async def get_workspace(self, user_id, agent_id, session_id, workspace_id=None):
+            import os
+            import time
+            from agentscope.workspace import LocalWorkspace
+
+            if workspace_id is None:
+                workspace_id = self.assign_workspace_id(
+                    user_id="", agent_id=agent_id, session_id="",
+                )
+
+            async with self._lock:
+                now = time.monotonic()
+                expired = self._pop_expired(now)
+                cached = self._cache.get(workspace_id)
+                if cached is not None:
+                    ws, _ = cached
+                    self._cache[workspace_id] = (ws, now)
+                    hit = ws
+                else:
+                    hit = None
+
+            if expired:
+                import asyncio
+                await asyncio.gather(
+                    *(self._safe_close(ws) for ws in expired),
+                    return_exceptions=True,
+                )
+
+            if hit is not None:
+                return hit
+
+            async with self._lock:
+                cached = self._cache.get(workspace_id)
+                if cached is not None:
+                    ws, _ = cached
+                    self._cache[workspace_id] = (ws, time.monotonic())
+                    return ws
+
+                # Use basedir directly — no agent_id subdirectory
+                ws = LocalWorkspace(
+                    workspace_id=workspace_id,
+                    workdir=self._basedir,
+                    default_mcps=self._default_mcps,
+                    skill_paths=self._skill_paths,
+                )
+                await ws.initialize()
+                self._cache[workspace_id] = (ws, time.monotonic())
+                return ws
+
+    workspace_manager = _FlatWorkspaceManager(
         basedir=str(workspace_path),
     )
 
@@ -116,6 +175,69 @@ def create_babi_app(settings: Settings):
     # --- Custom babi routes (before static mount) ---
 
     from agentscope.app.message_bus import MessageBusKeys
+    from fastapi import Query
+    from fastapi.responses import FileResponse, JSONResponse
+
+    # Workspace root for file tree / preview APIs
+    _workspace_root = workspace_path
+
+    def _safe_resolve(rel_path: str) -> Path | None:
+        """Resolve a relative path against workspace root, rejecting path traversal."""
+        resolved = (_workspace_root / rel_path).resolve()
+        if not str(resolved).startswith(str(_workspace_root.resolve())):
+            return None
+        return resolved
+
+    # Language mapping for syntax highlighting hints
+    _EXT_LANG = {
+        ".py": "python", ".js": "javascript", ".ts": "typescript",
+        ".java": "java", ".go": "go", ".rs": "rust",
+        ".html": "html", ".css": "css", ".json": "json",
+        ".xml": "xml", ".yaml": "yaml", ".yml": "yaml",
+        ".md": "markdown", ".sh": "bash", ".sql": "sql",
+        ".rb": "ruby", ".c": "c", ".cpp": "cpp",
+    }
+
+    @app.get("/api/workspace/tree")
+    async def workspace_tree(path: str = Query(default="")):
+        """List directory entries within the workspace."""
+        target = _safe_resolve(path)
+        if target is None or not target.is_dir():
+            return JSONResponse([], status_code=200)
+        items = []
+        try:
+            for entry in sorted(target.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
+                if entry.name.startswith("."):
+                    continue  # skip hidden files/dirs
+                items.append({
+                    "name": entry.name,
+                    "path": str(entry.relative_to(_workspace_root)),
+                    "isDir": entry.is_dir(),
+                })
+        except OSError as e:
+            logger.warning("workspace/tree error for '%s': %s", path, e)
+        return items
+
+    @app.get("/api/workspace/file")
+    async def workspace_file(path: str = Query()):
+        """Read text file content from workspace."""
+        target = _safe_resolve(path)
+        if target is None or not target.is_file():
+            return JSONResponse({"error": "File not found"}, status_code=404)
+        try:
+            content = target.read_text(encoding="utf-8", errors="replace")
+            lang = _EXT_LANG.get(target.suffix.lower(), "plaintext")
+            return {"content": content, "language": lang, "size": target.stat().st_size}
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    @app.get("/api/workspace/image")
+    async def workspace_image(path: str = Query()):
+        """Serve an image file from workspace."""
+        target = _safe_resolve(path)
+        if target is None or not target.is_file():
+            return JSONResponse({"error": "Image not found"}, status_code=404)
+        return FileResponse(str(target))
 
     @app.delete("/api/clear-messages")
     async def clear_session_messages(
@@ -207,7 +329,9 @@ async def bootstrap_babi(settings: Settings) -> dict:
 
         # 2. Create agent with babi system prompt
         agent_id = "babi-agent"
-        sys_prompt = _build_system_prompt()
+        from babi.utils.helpers import resolve_workspace
+        ws_path = resolve_workspace(settings.workspace)
+        sys_prompt = _build_system_prompt(workspace_path=ws_path)
         agent_data = AgentData(
             name="BabiAgent",
             system_prompt=sys_prompt,

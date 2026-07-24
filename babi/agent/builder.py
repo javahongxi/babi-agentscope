@@ -52,7 +52,7 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
     # Build system prompt with skills
     skill_tool = SkillTool()
     skills_list = list(skill_tool.skills.values())
-    sys_prompt = build_system_prompt(skills_list)
+    sys_prompt = build_system_prompt(skills_list, workspace_path=workspace_path)
 
     # Build toolkit with built-in filesystem/shell tools + custom tools
     toolkit = Toolkit(

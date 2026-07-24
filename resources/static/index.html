@@ -201,7 +201,7 @@
             </div>
         </div>
     </div>
-    <button class="sidebar-toggle" id="sidebar-toggle" style="display:none" onclick="toggleSidebar()" title="展开侧边栏">☰</button>
+    <button class="sidebar-toggle visible" id="sidebar-toggle" onclick="toggleSidebar()" title="展开侧边栏">☰</button>
 
     <script>
         const chatInner = document.getElementById('chat-inner');
@@ -691,10 +691,164 @@
         setupSSEHandlers();
         userInput.focus();
 
-        // Sidebar no-ops — AgentScope workspace has no file-tree API
-        function toggleSidebar() {}
-        function refreshTree() {}
-        function closeFilePreview() {}
+        // ========== File Tree & Preview ==========
+        const fileTreeEl = document.getElementById('file-tree');
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarToggleEl = document.getElementById('sidebar-toggle');
+        const filePreviewEl = document.getElementById('file-preview');
+        const previewFilenameEl = document.getElementById('preview-filename');
+        let activeFileItem = null;
+
+        const FILE_ICONS = {
+            'py': '🐍', 'js': '📜', 'ts': '📘', 'java': '☕', 'go': '🔵',
+            'html': '🌐', 'css': '🎨', 'json': '📋', 'xml': '📰', 'yaml': '⚙️',
+            'yml': '⚙️', 'md': '📝', 'sh': '🖥️', 'sql': '🗃️', 'txt': '📄',
+        };
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop().toLowerCase();
+            return FILE_ICONS[ext] || '📄';
+        }
+
+        async function loadTree(path, parentEl) {
+            try {
+                const resp = await fetch('/api/workspace/tree?path=' + encodeURIComponent(path));
+                const items = await resp.json();
+                items.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'file-tree-item';
+                    row.dataset.path = item.path;
+
+                    if (item.isDir) {
+                        const toggle = document.createElement('span');
+                        toggle.className = 'file-tree-toggle';
+                        toggle.textContent = '▶';
+                        row.appendChild(toggle);
+
+                        const icon = document.createElement('span');
+                        icon.className = 'icon';
+                        icon.textContent = '📁';
+                        row.appendChild(icon);
+
+                        const name = document.createElement('span');
+                        name.className = 'name';
+                        name.textContent = item.name;
+                        row.appendChild(name);
+
+                        const children = document.createElement('div');
+                        children.className = 'file-tree-children';
+                        children.style.display = 'none';
+
+                        row.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            const isOpen = children.style.display !== 'none';
+                            if (isOpen) {
+                                children.style.display = 'none';
+                                toggle.textContent = '▶';
+                                icon.textContent = '📁';
+                            } else {
+                                if (children.children.length === 0) {
+                                    await loadTree(item.path, children);
+                                }
+                                children.style.display = 'block';
+                                toggle.textContent = '▼';
+                                icon.textContent = '📂';
+                            }
+                        });
+
+                        parentEl.appendChild(row);
+                        parentEl.appendChild(children);
+                    } else {
+                        const icon = document.createElement('span');
+                        icon.className = 'icon';
+                        icon.textContent = getFileIcon(item.name);
+                        row.appendChild(icon);
+
+                        const name = document.createElement('span');
+                        name.className = 'name';
+                        name.textContent = item.name;
+                        row.appendChild(name);
+
+                        row.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openFilePreview(item.path, item.name);
+                            if (activeFileItem) activeFileItem.classList.remove('active');
+                            row.classList.add('active');
+                            activeFileItem = row;
+                        });
+
+                        parentEl.appendChild(row);
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to load file tree:', err);
+            }
+        }
+
+        async function openFilePreview(path, name) {
+            previewFilenameEl.textContent = name;
+            filePreviewEl.classList.add('open');
+
+            const contentEl = document.getElementById('file-preview-content');
+            const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(name);
+
+            if (isImage) {
+                contentEl.innerHTML = '<div class="image-preview"><img src="/api/workspace/image?path=' + encodeURIComponent(path) + '" alt="' + name + '"></div>';
+                contentEl.querySelector('img').addEventListener('click', function() {
+                    openLightbox(this.src);
+                });
+                return;
+            }
+
+            contentEl.innerHTML = '<pre><code id="preview-code"></code></pre>';
+            const codeEl = document.getElementById('preview-code');
+            codeEl.textContent = 'Loading...';
+
+            try {
+                const resp = await fetch('/api/workspace/file?path=' + encodeURIComponent(path));
+                const data = await resp.json();
+                if (data.error) {
+                    codeEl.textContent = 'Error: ' + data.error;
+                    return;
+                }
+                if (data.language && data.language !== 'plaintext' && typeof hljs !== 'undefined') {
+                    try {
+                        const result = hljs.highlight(data.content, { language: data.language });
+                        codeEl.innerHTML = result.value;
+                        codeEl.className = 'hljs language-' + data.language;
+                    } catch (e) {
+                        codeEl.textContent = data.content;
+                    }
+                } else {
+                    codeEl.textContent = data.content;
+                }
+            } catch (err) {
+                codeEl.textContent = 'Failed to load: ' + err.message;
+            }
+        }
+
+        function closeFilePreview() {
+            filePreviewEl.classList.remove('open');
+            if (activeFileItem) {
+                activeFileItem.classList.remove('active');
+                activeFileItem = null;
+            }
+        }
+
+        function toggleSidebar() {
+            sidebarEl.classList.toggle('collapsed');
+            const collapsed = sidebarEl.classList.contains('collapsed');
+            sidebarToggleEl.classList.toggle('visible', collapsed);
+            if (collapsed) closeFilePreview();
+        }
+
+        function refreshTree() {
+            fileTreeEl.innerHTML = '';
+            loadTree('', fileTreeEl);
+        }
+
+        // Initialize file tree on load
+        refreshTree();
     </script>
 </body>
 </html>

@@ -15,17 +15,21 @@ from babi.skills.loader import Skill
 logger = logging.getLogger(__name__)
 
 
-def build_system_prompt(skills: list[Skill] | None = None) -> str:
+def build_system_prompt(skills: list[Skill] | None = None, workspace_path: Path | None = None) -> str:
     """Build the complete system prompt with loaded skills.
 
     Args:
         skills: Collection of loaded skills (may be empty or None)
+        workspace_path: Optional workspace path; if provided and AGENTS.md
+            exists there, its content is prepended to the prompt
 
     Returns:
         Complete system prompt string
     """
     custom = _load_custom_instructions()
+    agents_md = _load_agents_md(workspace_path)
     sections = [
+        agents_md,
         _core_rules_section(),
         _github_section(),
         _skills_section(skills or []),
@@ -143,6 +147,26 @@ NETWORK ACCESS RULES (IMPORTANT):
 - If a foreign service returns an error or timeout, immediately fallback to a
   Chinese domestic alternative without retrying.
 - When using web_search, include Chinese keywords for better results."""
+
+
+def _load_agents_md(workspace_path: Path | None) -> str:
+    """Load AGENTS.md from the workspace directory.
+
+    Returns the file content prefixed with a header, or empty string
+    if the file does not exist or no workspace path is given.
+    """
+    if workspace_path is None:
+        return ""
+    agents_md = workspace_path / "AGENTS.md"
+    if not agents_md.is_file():
+        return ""
+    try:
+        content = agents_md.read_text(encoding="utf-8").strip()
+        if content:
+            return f"## Workspace Context\n\n{content}"
+    except Exception as e:
+        logger.warning("Failed to read AGENTS.md: %s", e)
+    return ""
 
 
 def _load_custom_instructions() -> str:
