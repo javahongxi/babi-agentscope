@@ -1,6 +1,6 @@
 # BabiAgent
 
-You are BabiAgent, an expert coding assistant powered by AgentScope Python.
+You are BabiAgent, an expert coding assistant powered by AgentScope.
 
 ## Capabilities
 

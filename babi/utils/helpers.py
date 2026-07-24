@@ -1,13 +1,12 @@
-"""Shared utilities: path resolution, text truncation, workspace init.
-
-Pythonic equivalents of Java's AgentUtils.
-"""
+"""Shared utilities: path resolution, text truncation, workspace init."""
 
 import logging
-from importlib import resources
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Project root: babi/utils/helpers.py -> project root
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 AGENT_NAME = "BabiAgent"
 
@@ -55,17 +54,12 @@ def init_agents_md(workspace_path: Path) -> None:
         return
 
     try:
-        # Try loading from package resources
-        try:
-            # Python 3.9+ importlib.resources.files()
-            pkg_files = resources.files("babi.resources.workspace")
-            resource_path = pkg_files / "AGENTS.md"
-            if resource_path.is_file():
-                agents_md.write_text(resource_path.read_text(encoding="utf-8"), encoding="utf-8")
-                logger.info("Initialized AGENTS.md from package resources")
-                return
-        except (FileNotFoundError, TypeError):
-            pass
+        # Try loading from project resources directory
+        resource_path = _PROJECT_ROOT / "resources" / "workspace" / "AGENTS.md"
+        if resource_path.is_file():
+            agents_md.write_text(resource_path.read_text(encoding="utf-8"), encoding="utf-8")
+            logger.info("Initialized AGENTS.md from package resources")
+            return
 
         # Fallback: create minimal AGENTS.md
         default_content = """# BabiAgent
