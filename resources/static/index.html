@@ -325,7 +325,14 @@
         }
 
         function clearMemory() {
-            alert('清除记忆功能暂不支持（AgentScope 版本）');
+            if (!confirm('确定要清除工作区记忆吗？这将删除 MEMORY.md，Agent 将不再记得之前的个人信息和上下文。')) return;
+            fetch('/api/chat/memory', { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('Memory cleared:', data.message);
+                    alert(data.message);
+                })
+                .catch(err => console.warn('Clear memory failed:', err));
         }
 
         function renderMarkdown(el, text) {

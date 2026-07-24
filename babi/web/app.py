@@ -239,6 +239,21 @@ def create_babi_app(settings: Settings):
             return JSONResponse({"error": "Image not found"}, status_code=404)
         return FileResponse(str(target))
 
+    @app.delete("/api/chat/memory")
+    async def clear_memory():
+        """Delete MEMORY.md from workspace so the agent forgets prior context."""
+        memory_file = _workspace_root / "MEMORY.md"
+        try:
+            if memory_file.exists():
+                memory_file.unlink()
+                logger.info("Deleted memory file: %s", memory_file)
+                return {"status": "ok", "message": f"已清除记忆文件 MEMORY.md"}
+            else:
+                return {"status": "ok", "message": "没有找到记忆文件 MEMORY.md"}
+        except OSError as e:
+            logger.warning("Failed to delete memory file: %s", e)
+            return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
     @app.delete("/api/clear-messages")
     async def clear_session_messages(
         session_id: str = "default",
