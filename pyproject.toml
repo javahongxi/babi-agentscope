@@ -1,7 +1,7 @@
 [project]
 name = "babi-agentscope"
 version = "1.0.0"
-description = "A coding agent application built with AgentScope Python"
+description = "A coding agent application built with AgentScope"
 requires-python = ">=3.10"
 dependencies = [
     "agentscope>=1.0",
