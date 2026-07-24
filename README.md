@@ -71,21 +71,6 @@ babi --web --port 9000          # 指定端口
 
 > Web 模式依赖 Redis，请确保本地 Redis 服务已启动。
 
-## 配置
-
-通过环境变量或 `.env` 文件配置（参见 [.env.example](.env.example)）：
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `DASHSCOPE_API_KEY` | 阿里云百炼 API Key（**必需**） | — |
-| `TAVILY_API_KEY` | Tavily Search API Key（Web 搜索功能，[免费申请](https://tavily.com)） | — |
-| `GITHUB_TOKEN` | GitHub 个人访问令牌 | — |
-| `BABI_MODEL_NAME` | 模型名称 | `qwen-plus` |
-| `BABI_FALLBACK_MODEL` | 降级模型 | `qwen-turbo` |
-| `BABI_WORKSPACE` | 工作目录 | `~/babi-agentscope-workspace` |
-| `BABI_HOST` | Web 服务地址 | `127.0.0.1` |
-| `BABI_PORT` | Web 服务端口 | `8900` |
-
 ## Skills 扩展
 
 Skills 是 Markdown 格式的可复用工作流指令，从以下目录自动加载（后者覆盖前者）：
@@ -98,37 +83,6 @@ Skills 是 Markdown 格式的可复用工作流指令，从以下目录自动加
 支持两种文件格式：
 - **单文件**：`my-skill.md`
 - **目录格式**：`my-skill/SKILL.md`
-
-Skill 文件示例：
-
-```markdown
----
-name: code-review
-description: Perform structured code review on source files
----
-
-# Instructions
-1. Read the target file...
-```
-
-## 项目结构
-
-```
-babi-agentscope/
-├── babi/
-│   ├── agent/          # Agent 构建与 Prompt 管理
-│   ├── middleware/      # 上下文截断等中间件
-│   ├── skills/         # Skill 加载器
-│   ├── tools/          # 内置工具（fetch_url, http_request, github_api, web_search 等）
-│   ├── utils/          # 工具函数
-│   ├── web/            # Web 服务（FastAPI）
-│   ├── cli.py          # CLI 入口（Click）
-│   └── config.py       # 配置管理（Pydantic Settings）
-├── resources/
-│   ├── static/         # Web 前端静态文件
-│   └── workspace/      # 默认工作区模板（AGENTS.md）
-└── tests/              # 测试
-```
 
 ## 开发
 
