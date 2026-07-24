@@ -10,8 +10,12 @@ use_skill to load the full instructions for a specific skill.
 
 from __future__ import annotations
 
+import logging
+
 from babi.skills.loader import Skill, load_all_skills
 from babi.tools import text_chunk
+
+logger = logging.getLogger(__name__)
 
 
 class SkillTool:
@@ -52,6 +56,7 @@ class SkillTool:
         The instructions will guide you through the workflow.
         Call list_skills first to see available skills.
         """
+        logger.info("Skill activated: %s", skill_name)
         skill = self._skills.get(skill_name)
 
         # Try case-insensitive match
@@ -63,6 +68,7 @@ class SkillTool:
 
         if skill is None:
             available = ", ".join(self._skills.keys())
+            logger.warning("Skill not found: %s (available: %s)", skill_name, available)
             return text_chunk(
                 f"Error: Skill '{skill_name}' not found. "
                 f"Available skills: {available}. "
@@ -70,6 +76,7 @@ class SkillTool:
                 state="ERROR",
             )
 
+        logger.info("Skill '%s' loaded successfully, returning instructions (%d chars)", skill_name, len(skill.body))
         result = f"## Skill: {skill.name}\n\n{skill.body}"
 
         if skill.directory is not None:

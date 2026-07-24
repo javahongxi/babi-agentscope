@@ -5,7 +5,7 @@ for chatting with the agent from the terminal.
 
 Usage:
     export DASHSCOPE_API_KEY=your_key
-    babi                          # default workspace ~/babi-workspace
+    babi                          # default workspace ~/babi-python-workspace
     babi --workspace ~/my-project
 """
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--workspace",
     default=None,
-    help="Workspace directory (default: ~/babi-workspace)",
+    help="Workspace directory (default: ~/babi-python-workspace)",
 )
 @click.option(
     "--model",
@@ -60,14 +60,17 @@ def main(workspace: str | None, model: str | None, host: str | None, port: int |
 
     Run in CLI mode (default) or start a web server with --web.
     """
-    # Configure logging — only for babi package, suppress noisy third-party loggers
+    # Configure logging — suppress noisy third-party loggers at root level.
+    # In CLI mode, also raise the babi logger to WARNING to keep the REPL clean;
+    # in Web mode, keep it at INFO (or DEBUG with --verbose) for server-side diagnostics.
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=logging.WARNING,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
-    logging.getLogger("babi").setLevel(log_level)
+    babi_log_level = log_level if web else logging.WARNING
+    logging.getLogger("babi").setLevel(babi_log_level)
 
     settings = get_settings()
 
