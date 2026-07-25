@@ -16,6 +16,7 @@
 - **Skills 扩展** — Markdown 定义的可复用工作流指令，支持全局与 Babi 专属目录两级加载
 - **任务追踪** — 内置 Todo 列表，可视化多步骤任务进度
 - **双端交互** — Web 聊天界面（Markdown 渲染 + 工具状态可视化）与 CLI 两种模式
+- **会话持久化** — 基于 Redis 的会话存储，跨重启保持对话上下文
 
 ## 环境准备
 
@@ -31,6 +32,9 @@ export TAVILY_API_KEY=your_tavily_api_key
 
 # 可选 — GitHub API 令牌（用于 GitHub 相关功能）
 export GITHUB_TOKEN=your_github_token
+
+# 可选 — Redis（用于 Web 模式会话持久化，默认 localhost:6379）
+# brew services start redis   # macOS 快速启动
 ```
 
 ## 安装
