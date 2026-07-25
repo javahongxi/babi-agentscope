@@ -1,8 +1,9 @@
 """Skill loader: loads Markdown-based skill definitions from directories.
 
-Skills are loaded from two directories (higher priority overrides lower):
+Skills are loaded from three directories (higher priority overrides lower):
 1. ~/.agents/skills/   — global shared skills (cross-project reuse)
 2. ~/.babi/skills/     — Babi-specific skills (higher priority)
+3. .qoder/skills/      — project-level skills (highest priority, relative to workspace root)
 
 Skill file format (Markdown with YAML front-matter):
     ---
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 GLOBAL_DIR = Path.home() / ".agents" / "skills"
 BABI_DIR = Path.home() / ".babi" / "skills"
 
+# Project-level skills directory name (relative to workspace root)
+PROJECT_SKILLS_DIR = ".qoder/skills"
+
 
 @dataclass(frozen=True, slots=True)
 class Skill:
@@ -45,10 +49,14 @@ class Skill:
     directory: Path | None
 
 
-def load_all_skills() -> dict[str, Skill]:
-    """Load all skills from global and Babi-specific directories.
+def load_all_skills(workspace_path: Path | None = None) -> dict[str, Skill]:
+    """Load all skills from global, Babi-specific, and project-level directories.
 
-    Babi-specific skills override global skills with the same name.
+    Project-level skills override Babi-specific skills, which override global.
+
+    Args:
+        workspace_path: Optional workspace root; if provided, loads skills
+            from .qoder/skills/ within it (highest priority)
 
     Returns:
         Dict mapping skill name -> Skill (insertion-ordered)
@@ -58,10 +66,16 @@ def load_all_skills() -> dict[str, Skill]:
     # 1. Global skills (lowest priority)
     _load_from_dir(GLOBAL_DIR, skills)
 
-    # 2. Babi-specific skills (higher priority, overrides global)
+    # 2. Babi-specific skills (medium priority, overrides global)
     _load_from_dir(BABI_DIR, skills)
 
-    logger.info("Loaded %d skill(s) from %s and %s", len(skills), GLOBAL_DIR, BABI_DIR)
+    # 3. Project-level skills (highest priority, relative to workspace root)
+    if workspace_path is not None:
+        project_skills = workspace_path / PROJECT_SKILLS_DIR
+        _load_from_dir(project_skills, skills)
+
+    logger.info("Loaded %d skill(s) from %s, %s%s", len(skills), GLOBAL_DIR, BABI_DIR,
+                f", and {workspace_path / PROJECT_SKILLS_DIR}" if workspace_path else "")
     return skills
 
 

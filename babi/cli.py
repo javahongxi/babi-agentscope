@@ -5,7 +5,7 @@ for chatting with the agent from the terminal.
 
 Usage:
     export DASHSCOPE_API_KEY=your_key
-    babi                          # default workspace ~/babi-agentscope-workspace
+    babi                          # workspace = current directory
     babi --workspace ~/my-project
 """
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 
 import click
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--workspace",
     default=None,
-    help="Workspace directory (default: ~/babi-agentscope-workspace)",
+    help="Workspace directory (default: current directory)",
 )
 @click.option(
     "--model",
@@ -77,6 +78,8 @@ def main(workspace: str | None, model: str | None, host: str | None, port: int |
     # Override settings from CLI args
     if workspace:
         settings.workspace = workspace
+    elif not web:
+        settings.workspace = os.getcwd()
     if model:
         settings.model_name = model
     if host:
@@ -126,7 +129,7 @@ async def _cli_repl(settings) -> None:
 
     print()
     print("=" * 60)
-    print("Babi Agent - Powered by AgentScope Python")
+    print("Babi Agent - Powered by AgentScope")
     print("=" * 60)
     print(f"Workspace: {workspace_path}")
     print("Built-in tools: read_file, write_file, edit_file, grep_files, execute")

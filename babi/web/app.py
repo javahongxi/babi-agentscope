@@ -24,7 +24,7 @@ from babi.tools.web_search import web_search
 logger = logging.getLogger(__name__)
 
 
-def _build_extra_tool_factory(settings: Settings):
+def _build_extra_tool_factory(settings: Settings, workspace_path: Path | None = None):
     """Create the AgentToolFactory for babi-specific custom tools.
 
     Returns an async factory ``(user_id, agent_id, session_id) -> list[ToolBase]``
@@ -33,7 +33,7 @@ def _build_extra_tool_factory(settings: Settings):
     from agentscope.tool import FunctionTool
 
     # Pre-load skills once at startup
-    skill_tool = SkillTool()
+    skill_tool = SkillTool(workspace_path)
     skills_list = list(skill_tool.skills.values())
     logger.info("Loaded %d skills for tool factory", len(skills_list))
 
@@ -53,7 +53,7 @@ def _build_extra_tool_factory(settings: Settings):
 
 def _build_system_prompt(workspace_path: Path | None = None) -> str:
     """Build the babi system prompt with skills."""
-    skill_tool = SkillTool()
+    skill_tool = SkillTool(workspace_path)
     skills_list = list(skill_tool.skills.values())
     return build_system_prompt(skills_list, workspace_path=workspace_path)
 
@@ -152,7 +152,7 @@ def create_babi_app(settings: Settings):
     )
 
     # Extra tools factory
-    extra_agent_tools = _build_extra_tool_factory(settings)
+    extra_agent_tools = _build_extra_tool_factory(settings, workspace_path)
 
     # Build the app
     app = create_app(

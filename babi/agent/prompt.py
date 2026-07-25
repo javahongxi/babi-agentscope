@@ -29,16 +29,43 @@ def build_system_prompt(skills: list[Skill] | None = None, workspace_path: Path 
     custom = _load_custom_instructions()
     agents_md = _load_agents_md(workspace_path)
     sections = [
+        _workspace_section(workspace_path),
         agents_md,
         _core_rules_section(),
         _github_section(),
-        _skills_section(skills or []),
+        _skills_section(skills or [], workspace_path),
         _guidelines_section(),
     ]
     if custom:
         sections.append(custom)
 
     return "\n\n".join(s for s in sections if s).strip()
+
+
+def _workspace_section(workspace_path: Path | None) -> str:
+    """Return the workspace context section (highest priority)."""
+    if workspace_path is None:
+        return ""
+    workspace = str(workspace_path)
+    return f"""=== WORKSPACE CONTEXT (HIGHEST PRIORITY) ===
+Your current workspace is: {workspace}
+
+This is the default working directory — use it as the base for relative paths,
+git operations, and project-level context.
+
+FILE ACCESS:
+- You CAN read and access files anywhere on the local filesystem, not just
+  within the workspace. There is no sandbox restriction.
+- When modifying files OUTSIDE the workspace, confirm with the user first
+  to avoid unintended side effects on other projects or system files.
+
+CRITICAL — WORKSPACE IDENTITY:
+- NEVER report a workspace path from conversation history or memory.
+- NEVER assume the workspace is a previous session's directory.
+- If the user asks "what is the current directory/workspace?", respond with
+  the path above. Do NOT guess, do NOT recall — use THIS value.
+- Each session may have a DIFFERENT workspace. Always trust this system-level
+  context over any prior conversation."""
 
 
 def _core_rules_section() -> str:
@@ -98,12 +125,13 @@ def _github_section() -> str:
    let the tool tell you that, do not preemptively deny the capability."""
 
 
-def _skills_section(skills: list[Skill]) -> str:
+def _skills_section(skills: list[Skill], workspace_path: Path | None = None) -> str:
     base = """SKILLS SYSTEM:
 Skills are reusable workflow instructions stored as Markdown files.
-They are loaded from two directories:
-- ~/.agents/skills/ — global shared skills (cross-project reuse)
-- ~/.babi/skills/   — Babi-specific skills (higher priority, overrides global)
+They are loaded from three directories (lowest to highest priority):
+- ~/.agents/skills/    — global shared skills (cross-project reuse)
+- ~/.babi/skills/      — Babi-specific skills (overrides global)
+- .qoder/skills/       — project-level skills (highest priority, relative to workspace root)
 
 IMPORTANT: When the user's request matches ANY of the skills below, you MUST
 call use_skill(skill_name) FIRST to load the full instructions, then follow them.

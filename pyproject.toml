@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-babi = "babi.cli:main"
+babi-as = "babi.cli:main"
 
 [build-system]
 requires = ["setuptools>=75"]

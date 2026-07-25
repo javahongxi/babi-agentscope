@@ -2,7 +2,7 @@
 
 面向开发者的 AI Coding Agent，基于 ReAct 模式提供代码分析、构建、调试等开发辅助能力。
 
-> 技术栈：AgentScope Python SDK + FastAPI + Click
+> 技术栈：AgentScope SDK + FastAPI + Click
 
 ## 特性
 
@@ -13,7 +13,7 @@
 - **Web 搜索** — 基于 Tavily 的联网检索，实时获取最新信息
 - **HTTP 请求** — 调用任意 REST API
 - **GitHub 集成** — 通过 API 操作 Issues、PR、仓库、Pinned Repos 等
-- **Skills 扩展** — Markdown 定义的可复用工作流指令，支持全局与 Babi 专属目录两级加载
+- **Skills 扩展** — Markdown 定义的可复用工作流指令，支持全局、Babi 专属、项目级三级加载
 - **任务追踪** — 内置 Todo 列表，可视化多步骤任务进度
 - **双端交互** — Web 聊天界面（Markdown 渲染 + 工具状态可视化）与 CLI 两种模式
 - **会话持久化** — 基于 Redis 的会话存储，跨重启保持对话上下文
@@ -21,8 +21,8 @@
 ## 环境准备
 
 ```bash
-# Python 3.12+
-python --version  # 确认版本 >= 3.12
+# Python 3.10+
+python --version  # 确认版本 >= 3.10
 
 # 阿里云百炼 API Key（必需）
 export DASHSCOPE_API_KEY=your_api_key
@@ -38,6 +38,16 @@ export GITHUB_TOKEN=your_github_token
 ```
 
 ## 安装
+
+### 一键安装（推荐）
+
+```bash
+./install.sh
+```
+
+安装完成后在终端输入 `babi-as` 即可启动，默认以当前目录为工作区。
+
+### 手动安装
 
 ```bash
 # 克隆项目
@@ -56,10 +66,10 @@ pip install -e ".[dev]"
 ### 命令行模式（默认）
 
 ```bash
-babi                            # 默认工作目录 ~/babi-agentscope-workspace
-babi --workspace ~/my-project   # 指定工作目录
-babi --model qwen-max           # 指定模型
-babi -v                         # 开启详细日志
+babi-as                           # 默认以当前目录为工作区
+babi-as --workspace ~/my-project  # 指定工作目录
+babi-as --model qwen-max          # 指定模型
+babi-as -v                        # 开启详细日志
 ```
 
 进入交互 REPL 后直接输入问题即可对话，输入 `exit` 退出。
@@ -67,8 +77,8 @@ babi -v                         # 开启详细日志
 ### Web 聊天界面
 
 ```bash
-babi --web                      # 启动 Web 服务（默认 127.0.0.1:8900）
-babi --web --port 9000          # 指定端口
+babi-as --web                     # 启动 Web 服务（默认 127.0.0.1:8900）
+babi-as --web --port 9000         # 指定端口
 ```
 
 打开浏览器访问 `http://localhost:8900`，即可在聊天界面中与 Babi Agent 交互。
@@ -82,11 +92,18 @@ Skills 是 Markdown 格式的可复用工作流指令，从以下目录自动加
 | 优先级 | 目录 | 说明 |
 |--------|------|------|
 | 低 | `~/.agents/skills/` | 全局共享 Skills |
-| 高 | `~/.babi/skills/` | Babi 专属 Skills |
+| 中 | `~/.babi/skills/` | Babi 专属 Skills |
+| 高 | `.qoder/skills/` | 项目级 Skills（相对于工作区根目录） |
 
 支持两种文件格式：
 - **单文件**：`my-skill.md`
 - **目录格式**：`my-skill/SKILL.md`
+
+## 卸载
+
+```bash
+./uninstall.sh
+```
 
 ## 开发
 

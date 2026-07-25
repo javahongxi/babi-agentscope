@@ -1,4 +1,4 @@
-"""Babi Agent - A coding agent application built with AgentScope Python."""
+"""Babi Agent - A coding agent application built with AgentScope."""
 
 import asyncio
 import inspect

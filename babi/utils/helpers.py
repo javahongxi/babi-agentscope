@@ -64,7 +64,7 @@ def init_agents_md(workspace_path: Path) -> None:
         # Fallback: create minimal AGENTS.md
         default_content = """# BabiAgent
 
-You are BabiAgent, an expert coding assistant powered by AgentScope Python.
+You are BabiAgent, an expert coding assistant powered by AgentScope.
 
 ## Rules
 

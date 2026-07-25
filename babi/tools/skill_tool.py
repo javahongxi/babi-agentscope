@@ -3,6 +3,7 @@
 Skills are Markdown-based instruction sets loaded from:
 - ~/.agents/skills/ — global shared skills
 - ~/.babi/skills/   — Babi-specific skills (higher priority)
+- .qoder/skills/    — project-level skills (highest priority, relative to workspace root)
 
 The agent calls list_skills to see what's available, then
 use_skill to load the full instructions for a specific skill.
@@ -11,6 +12,7 @@ use_skill to load the full instructions for a specific skill.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from babi.skills.loader import Skill, load_all_skills
 from babi.tools import text_chunk
@@ -25,8 +27,8 @@ class SkillTool:
     for the agent to list and use skills.
     """
 
-    def __init__(self) -> None:
-        self._skills: dict[str, Skill] = load_all_skills()
+    def __init__(self, workspace_path: Path | None = None) -> None:
+        self._skills: dict[str, Skill] = load_all_skills(workspace_path)
 
     @property
     def skills(self) -> dict[str, Skill]:

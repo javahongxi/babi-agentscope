@@ -50,7 +50,7 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
     logger.info("Agent workspace: %s", workspace_path)
 
     # Build system prompt with skills
-    skill_tool = SkillTool()
+    skill_tool = SkillTool(workspace_path)
     skills_list = list(skill_tool.skills.values())
     sys_prompt = build_system_prompt(skills_list, workspace_path=workspace_path)
 
