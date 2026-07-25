@@ -297,6 +297,43 @@ def create_babi_app(settings: Settings):
 
         return {"status": "ok", "session_id": session_id, "cleared": deleted}
 
+    @app.post("/api/ensure-session")
+    async def ensure_session(
+        session_id: str = "default",
+        x_user_id: str = Header(default="babi-user", alias="X-User-ID"),
+    ):
+        """Ensure a session exists in Redis, creating it with default config if needed."""
+        from agentscope.agent._agent import AgentState
+        from agentscope.app.storage import SessionConfig
+        from agentscope.app.storage._model._session import ChatModelConfig
+        from agentscope.permission import PermissionContext, PermissionMode
+
+        agent_id = "babi-agent"
+        existing = await storage.get_session(x_user_id, agent_id, session_id)
+        if existing is not None:
+            return {"session_id": session_id, "created": False}
+
+        session_record = await storage.upsert_session(
+            user_id=x_user_id,
+            agent_id=agent_id,
+            session_id=session_id,
+            config=SessionConfig(
+                workspace_id="default",
+                name=session_id,
+                chat_model_config=ChatModelConfig(
+                    type="dashscope",
+                    credential_id="dashscope-default",
+                    model=settings.model_name,
+                    parameters={"stream": True, "max_retries": settings.max_retries},
+                ),
+            ),
+            state=AgentState(
+                permission_context=PermissionContext(mode=PermissionMode.BYPASS),
+            ),
+        )
+        logger.info("Created session '%s' for user '%s'", session_id, x_user_id)
+        return {"session_id": session_record.id, "created": True}
+
     # Mount static frontend files at root
     static_dir = Path(__file__).parent.parent.parent / "resources" / "static"
     if static_dir.is_dir():
@@ -309,8 +346,9 @@ def create_babi_app(settings: Settings):
 async def bootstrap_babi(settings: Settings) -> dict:
     """Bootstrap babi resources in Redis: credential + agent + default session.
 
-    This is called once at startup to ensure the default agent and session
-    exist so the frontend can start chatting immediately.
+    Called once at startup. The default session (id="default") is pre-created
+    so the frontend can chat immediately. Additional sessions are created
+    on demand via POST /api/ensure-session.
 
     Args:
         settings: Application settings
@@ -333,8 +371,9 @@ async def bootstrap_babi(settings: Settings) -> dict:
     storage = RedisStorage(host="localhost", port=6379)
     async with storage:
         user_id = "babi-user"
+        agent_id = "babi-agent"
 
-        # 1. Create DashScope credential (id is auto-generated if not set)
+        # 1. Create DashScope credential
         credential = DashScopeCredential(
             id="dashscope-default",
             api_key=settings.dashscope_api_key,
@@ -343,7 +382,6 @@ async def bootstrap_babi(settings: Settings) -> dict:
         logger.info("Credential '%s' configured", credential_id)
 
         # 2. Create agent with babi system prompt
-        agent_id = "babi-agent"
         from babi.utils.helpers import resolve_workspace
         ws_path = resolve_workspace(settings.workspace)
         sys_prompt = _build_system_prompt(workspace_path=ws_path)
@@ -353,32 +391,37 @@ async def bootstrap_babi(settings: Settings) -> dict:
             context_config=ContextConfig(),
             react_config=ReActConfig(),
         )
-        agent_record = AgentRecord(user_id=user_id, data=agent_data)
-        agent_id = await storage.upsert_agent(user_id, agent_record)
+        agent_record = AgentRecord(id=agent_id, user_id=user_id, data=agent_data)
+        await storage.upsert_agent(user_id, agent_record)
         logger.info("Agent '%s' configured with system prompt (%d chars)", agent_id, len(sys_prompt))
 
-        # 3. Create default session with model config + BYPASS permission
-        session_config = SessionConfig(
-            workspace_id="default",
-            name="Default Session",
-            chat_model_config=ChatModelConfig(
-                type="dashscope",
-                credential_id=credential_id,
-                model=settings.model_name,
-                parameters={"stream": True, "max_retries": settings.max_retries},
-            ),
-        )
-        agent_state = AgentState(
-            permission_context=PermissionContext(mode=PermissionMode.BYPASS),
-        )
-        session_record = await storage.upsert_session(
-            user_id=user_id,
-            agent_id=agent_id,
-            config=session_config,
-            state=agent_state,
-            session_id="default",
-        )
-        logger.info("Session '%s' configured with model '%s'", session_record.id, settings.model_name)
+        # 3. Create default session only if it doesn't exist yet.
+        #    Upsertting unconditionally would overwrite state.context
+        #    (conversation history), causing the agent to "forget" after restart.
+        existing_session = await storage.get_session(user_id, agent_id, "default")
+        if existing_session is not None:
+            session_record = existing_session
+            logger.info("Default session already exists, skipping creation")
+        else:
+            session_record = await storage.upsert_session(
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id="default",
+                config=SessionConfig(
+                    workspace_id="default",
+                    name="Default Session",
+                    chat_model_config=ChatModelConfig(
+                        type="dashscope",
+                        credential_id=credential_id,
+                        model=settings.model_name,
+                        parameters={"stream": True, "max_retries": settings.max_retries},
+                    ),
+                ),
+                state=AgentState(
+                    permission_context=PermissionContext(mode=PermissionMode.BYPASS),
+                ),
+            )
+            logger.info("Default session created, model='%s'", settings.model_name)
 
     return {
         "user_id": user_id,

@@ -210,7 +210,7 @@
         const sendBtn = document.getElementById('send-btn');
         const sessionIdInput = document.getElementById('session-id');
         const USER_ID = 'babi-user';
-        let agentId = null;       // Resolved at startup from /agent/
+        const AGENT_ID = 'babi-agent';
         let isSending = false;
         let eventSource = null;   // Persistent SSE connection
 
@@ -230,6 +230,25 @@
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
+        // Auto-reconnect SSE when session ID changes (like Java/LangGraph versions)
+        sessionIdInput.addEventListener('change', function() {
+            const sessionId = this.value.trim() || 'default';
+            if (sessionId !== currentSseSession) {
+                chatInner.innerHTML = '';
+                activeReply = null;
+                isSending = false;
+                sendBtn.disabled = false;
+                currentSseSession = sessionId;
+                connectSSEForSession(sessionId);
+            }
+        });
+        sessionIdInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur(); // triggers change event
+            }
+        });
+
         // Enter to send, Shift+Enter for newline
         userInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -238,32 +257,25 @@
             }
         });
 
-        // Resolve agent ID at startup
-        async function initAgent() {
-            try {
-                const resp = await fetch('/agent/', { headers: { 'X-User-ID': USER_ID } });
-                const data = await resp.json();
-                if (data.agents && data.agents.length > 0) {
-                    agentId = data.agents[0].id;
-                    console.log('Agent resolved:', agentId);
-                    // Open SSE stream for default session
-                    connectSSE();
-                } else {
-                    console.error('No agents found');
-                    addMessage('agent', '⚠️ 未找到 Agent，请检查 bootstrap 配置');
-                }
-            } catch (err) {
-                console.error('Failed to resolve agent:', err);
-            }
+        // Ensure session exists in Redis (create on demand, transparent to user)
+        async function ensureSession(sessionId) {
+            const resp = await fetch('/api/ensure-session?session_id=' + encodeURIComponent(sessionId), {
+                method: 'POST',
+                headers: { 'X-User-ID': USER_ID },
+            });
+            return resp.json();
         }
+
+        // Track current session for SSE reconnection
+        let currentSseSession = null;
 
         // Connect persistent SSE stream via fetch (EventSource doesn't support custom headers)
         let sseAbort = null;
-        function connectSSE() {
-            const sessionId = sessionIdInput.value.trim() || 'default';
+        // Connect SSE for a specific session (used for reconnects)
+        function connectSSEForSession(sessionId) {
             if (sseAbort) sseAbort.abort();
             sseAbort = new AbortController();
-            const url = '/sessions/' + encodeURIComponent(sessionId) + '/stream?agent_id=' + encodeURIComponent(agentId);
+            const url = '/sessions/' + encodeURIComponent(sessionId) + '/stream?agent_id=' + encodeURIComponent(AGENT_ID);
             fetch(url, {
                 headers: { 'X-User-ID': USER_ID },
                 signal: sseAbort.signal,
@@ -275,19 +287,17 @@
                     reader.read().then(({ done, value }) => {
                         if (done) {
                             console.log('SSE stream ended, reconnecting...');
-                            setTimeout(connectSSE, 3000);
+                            setTimeout(function() { connectSSEForSession(currentSseSession); }, 3000);
                             return;
                         }
                         buffer += decoder.decode(value, { stream: true });
-                        // Parse SSE frames: data: {...}\n\n
                         const frames = buffer.split('\n\n');
-                        buffer = frames.pop(); // keep incomplete frame
+                        buffer = frames.pop();
                         for (const frame of frames) {
                             const trimmed = frame.trim();
-                            if (!trimmed || trimmed.startsWith(':')) continue; // skip heartbeat
+                            if (!trimmed || trimmed.startsWith(':')) continue;
                             const dataLine = trimmed.replace(/^data:\s*/, '');
                             if (!dataLine) continue;
-                            // Dispatch to onmessage handler
                             if (typeof eventSourceOnMessage === 'function') {
                                 try {
                                     eventSourceOnMessage(JSON.parse(dataLine));
@@ -298,7 +308,7 @@
                     }).catch(err => {
                         if (err.name !== 'AbortError') {
                             console.warn('SSE read error, reconnecting...', err);
-                            setTimeout(connectSSE, 3000);
+                            setTimeout(function() { connectSSEForSession(currentSseSession); }, 3000);
                         }
                     });
                 }
@@ -306,9 +316,15 @@
             }).catch(err => {
                 if (err.name !== 'AbortError') {
                     console.warn('SSE connect error, reconnecting...', err);
-                    setTimeout(connectSSE, 3000);
+                    setTimeout(function() { connectSSEForSession(currentSseSession); }, 3000);
                 }
             });
+        }
+
+        function connectSSE() {
+            const sessionId = sessionIdInput.value.trim() || 'default';
+            currentSseSession = sessionId;
+            connectSSEForSession(sessionId);
         }
 
         async function clearChat() {
@@ -602,12 +618,20 @@
             };
         }
 
-        function sendMessage() {
+        async function sendMessage() {
             const message = userInput.value.trim();
-            if (!message || isSending || !agentId) return;
-            isSending = true;
+            if (!message || isSending) return;
 
             const sessionId = sessionIdInput.value.trim() || 'default';
+
+            // Ensure session exists before sending
+            try {
+                await ensureSession(sessionId);
+            } catch (e) {
+                console.warn('ensureSession failed:', e);
+            }
+
+            isSending = true;
             addMessage('user', message);
             userInput.value = '';
             userInput.style.height = 'auto';
@@ -641,7 +665,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-User-ID': USER_ID },
                 body: JSON.stringify({
-                    agent_id: agentId,
+                    agent_id: AGENT_ID,
                     session_id: sessionId,
                     input: {
                         name: 'user',
@@ -693,8 +717,8 @@
             }
         })();
 
-        // Init: resolve agent + open SSE, then focus input
-        initAgent();
+        // Init: connect SSE and focus input
+        connectSSE();
         setupSSEHandlers();
         userInput.focus();
 
