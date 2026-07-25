@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from types import MappingProxyType
 
 from babi.skills.loader import Skill, load_all_skills
 from babi.tools import text_chunk
@@ -31,9 +32,9 @@ class SkillTool:
         self._skills: dict[str, Skill] = load_all_skills(workspace_path)
 
     @property
-    def skills(self) -> dict[str, Skill]:
-        """Return the loaded skills map (unmodifiable view)."""
-        return dict(self._skills)
+    def skills(self) -> MappingProxyType[str, Skill]:
+        """Return a read-only view of the loaded skills map."""
+        return MappingProxyType(self._skills)
 
     def list_skills(self) -> "ToolChunk":
         """List all available skills. Returns skill names and descriptions.

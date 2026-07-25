@@ -111,7 +111,7 @@ def _load_single_file(path: Path, target: dict[str, Skill]) -> None:
         if skill is not None:
             target[skill.name] = skill
             logger.debug("Loaded skill '%s' from %s", skill.name, path)
-    except Exception as e:
+    except OSError as e:
         logger.warning("Failed to load skill from %s: %s", path, e)
 
 

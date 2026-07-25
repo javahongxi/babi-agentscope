@@ -77,5 +77,5 @@ You are BabiAgent, an expert coding assistant powered by AgentScope.
         agents_md.write_text(default_content, encoding="utf-8")
         logger.info("Created default AGENTS.md in workspace")
 
-    except Exception as e:
+    except OSError as e:
         logger.warning("Failed to initialize AGENTS.md: %s", e)

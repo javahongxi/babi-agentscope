@@ -192,7 +192,7 @@ def _load_agents_md(workspace_path: Path | None) -> str:
         content = agents_md.read_text(encoding="utf-8").strip()
         if content:
             return f"## Workspace Context\n\n{content}"
-    except Exception as e:
+    except OSError as e:
         logger.warning("Failed to read AGENTS.md: %s", e)
     return ""
 

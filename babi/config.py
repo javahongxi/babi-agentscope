@@ -4,7 +4,10 @@ Replaces Java's application.yml + Spring @Value injection with type-safe
 Python configuration loaded from environment variables and .env files.
 """
 
+import os
+from functools import lru_cache
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -49,7 +52,6 @@ class Settings(BaseSettings):
     @property
     def dashscope_api_key(self) -> str:
         """Resolve DashScope API key from environment."""
-        import os
         key = os.environ.get("DASHSCOPE_API_KEY", "")
         if not key:
             raise SystemExit(
@@ -60,13 +62,7 @@ class Settings(BaseSettings):
         return key
 
 
-# Singleton settings instance
-_settings: Settings | None = None
-
-
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Get or create the global settings instance."""
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-    return _settings
+    """Get the global settings instance (cached)."""
+    return Settings()

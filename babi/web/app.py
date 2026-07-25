@@ -9,8 +9,13 @@ Replaces the previous custom FastAPI implementation.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from pathlib import Path
+
+from agentscope.app.workspace_manager import LocalWorkspaceManager
+from agentscope.workspace import LocalWorkspace
 
 from babi.agent.prompt import build_system_prompt
 from babi.config import Settings
@@ -22,6 +27,59 @@ from babi.tools.skill_tool import SkillTool
 from babi.tools.web_search import web_search
 
 logger = logging.getLogger(__name__)
+
+
+class _FlatWorkspaceManager(LocalWorkspaceManager):
+    """LocalWorkspaceManager that uses basedir directly as workdir.
+
+    Babi is single-agent, so we skip the per-agent subdirectory
+    (e.g. basedir/d7a39143054848a6bc6ab419a1457fb7) and share one
+    workspace directory — same as the Java version.
+    """
+
+    async def get_workspace(self, user_id, agent_id, session_id, workspace_id=None):
+        if workspace_id is None:
+            workspace_id = self.assign_workspace_id(
+                user_id="", agent_id=agent_id, session_id="",
+            )
+
+        async with self._lock:
+            now = time.monotonic()
+            expired = self._pop_expired(now)
+            cached = self._cache.get(workspace_id)
+            if cached is not None:
+                ws, _ = cached
+                self._cache[workspace_id] = (ws, now)
+                hit = ws
+            else:
+                hit = None
+
+        if expired:
+            await asyncio.gather(
+                *(self._safe_close(ws) for ws in expired),
+                return_exceptions=True,
+            )
+
+        if hit is not None:
+            return hit
+
+        async with self._lock:
+            cached = self._cache.get(workspace_id)
+            if cached is not None:
+                ws, _ = cached
+                self._cache[workspace_id] = (ws, time.monotonic())
+                return ws
+
+            # Use basedir directly — no agent_id subdirectory
+            ws = LocalWorkspace(
+                workspace_id=workspace_id,
+                workdir=self._basedir,
+                default_mcps=self._default_mcps,
+                skill_paths=self._skill_paths,
+            )
+            await ws.initialize()
+            self._cache[workspace_id] = (ws, time.monotonic())
+            return ws
 
 
 def _build_extra_tool_factory(settings: Settings, workspace_path: Path | None = None):
@@ -70,7 +128,6 @@ def create_babi_app(settings: Settings):
     from agentscope.app import create_app
     from agentscope.app.message_bus import InMemoryMessageBus
     from agentscope.app.storage import RedisStorage
-    from agentscope.app.workspace_manager import LocalWorkspaceManager
     from fastapi import Header
     from fastapi.middleware import Middleware
     from fastapi.middleware.cors import CORSMiddleware
@@ -88,65 +145,7 @@ def create_babi_app(settings: Settings):
     # Message bus: in-memory (single process)
     message_bus = InMemoryMessageBus()
 
-    # Workspace manager: use basedir directly (no agent_id subdirectory),
-    # matching the Java version's flat workspace layout.
-    class _FlatWorkspaceManager(LocalWorkspaceManager):
-        """LocalWorkspaceManager that uses basedir directly as workdir.
-
-        Babi is single-agent, so we skip the per-agent subdirectory
-        (e.g. basedir/d7a39143054848a6bc6ab419a1457fb7) and share one
-        workspace directory — same as the Java version.
-        """
-
-        async def get_workspace(self, user_id, agent_id, session_id, workspace_id=None):
-            import os
-            import time
-            from agentscope.workspace import LocalWorkspace
-
-            if workspace_id is None:
-                workspace_id = self.assign_workspace_id(
-                    user_id="", agent_id=agent_id, session_id="",
-                )
-
-            async with self._lock:
-                now = time.monotonic()
-                expired = self._pop_expired(now)
-                cached = self._cache.get(workspace_id)
-                if cached is not None:
-                    ws, _ = cached
-                    self._cache[workspace_id] = (ws, now)
-                    hit = ws
-                else:
-                    hit = None
-
-            if expired:
-                import asyncio
-                await asyncio.gather(
-                    *(self._safe_close(ws) for ws in expired),
-                    return_exceptions=True,
-                )
-
-            if hit is not None:
-                return hit
-
-            async with self._lock:
-                cached = self._cache.get(workspace_id)
-                if cached is not None:
-                    ws, _ = cached
-                    self._cache[workspace_id] = (ws, time.monotonic())
-                    return ws
-
-                # Use basedir directly — no agent_id subdirectory
-                ws = LocalWorkspace(
-                    workspace_id=workspace_id,
-                    workdir=self._basedir,
-                    default_mcps=self._default_mcps,
-                    skill_paths=self._skill_paths,
-                )
-                await ws.initialize()
-                self._cache[workspace_id] = (ws, time.monotonic())
-                return ws
-
+    # Workspace manager: flat layout (no agent_id subdirectory)
     workspace_manager = _FlatWorkspaceManager(
         basedir=str(workspace_path),
     )
@@ -228,7 +227,7 @@ def create_babi_app(settings: Settings):
             content = target.read_text(encoding="utf-8", errors="replace")
             lang = _EXT_LANG.get(target.suffix.lower(), "plaintext")
             return {"content": content, "language": lang, "size": target.stat().st_size}
-        except Exception as e:
+        except OSError as e:
             return JSONResponse({"error": str(e)}, status_code=500)
 
     @app.get("/api/workspace/image")

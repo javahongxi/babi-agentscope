@@ -141,7 +141,7 @@ async def _cli_repl(settings) -> None:
     agent = build_agent(settings, workspace_path)
 
     # REPL loop
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     while True:
         try:
             user_input = await loop.run_in_executor(None, lambda: input("You: "))

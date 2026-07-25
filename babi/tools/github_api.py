@@ -79,7 +79,7 @@ def github_api_request(
 
         # Auto-format pinned repos GraphQL response
         if response.status_code == 200 and normalized_path == "/graphql":
-            formatted = _try_format_pinned_repos(response_body)
+            formatted = _format_pinned_repos(response_body)
             if formatted is not None:
                 return text_chunk(formatted)
 
@@ -133,7 +133,7 @@ def github_pinned_repos(username: str) -> "ToolChunk":
         response_body = response.text
 
         if response.status_code == 200:
-            formatted = _format_pinned_repos_markdown(response_body, username)
+            formatted = _format_pinned_repos(response_body, username)
             if formatted is not None:
                 return text_chunk(formatted)
 
@@ -143,49 +143,27 @@ def github_pinned_repos(username: str) -> "ToolChunk":
         return text_chunk(f"Error: {e}", state="ERROR")
 
 
-def _try_format_pinned_repos(json_str: str) -> str | None:
-    """Try to format a GraphQL response as pinned repos Markdown."""
+def _format_pinned_repos(json_str: str, username: str | None = None) -> str | None:
+    """Parse pinned repos GraphQL JSON and return formatted Markdown.
+
+    Returns None if the response does not contain pinned repos data.
+    """
     try:
         root = json.loads(json_str)
-        data = root.get("data")
-        if not data:
-            return None
-        user = data.get("user")
-        if not user:
-            return None
-        pinned = user.get("pinnedItems")
-        if not pinned:
-            return None
-        nodes = pinned.get("nodes")
+        nodes = (
+            root.get("data", {})
+            .get("user", {})
+            .get("pinnedItems", {})
+            .get("nodes")
+        )
         if nodes is None:
             return None
-        return _do_format_pinned_repos(nodes, None)
-    except Exception:
+        return _render_pinned_repos(nodes, username)
+    except (json.JSONDecodeError, AttributeError, TypeError):
         return None
 
 
-def _format_pinned_repos_markdown(json_str: str, username: str) -> str | None:
-    """Parse pinned repos GraphQL JSON response and return Markdown."""
-    try:
-        root = json.loads(json_str)
-        data = root.get("data")
-        if not data:
-            return None
-        user = data.get("user")
-        if not user:
-            return None
-        pinned = user.get("pinnedItems")
-        if not pinned:
-            return None
-        nodes = pinned.get("nodes")
-        if nodes is None:
-            return None
-        return _do_format_pinned_repos(nodes, username)
-    except Exception:
-        return None
-
-
-def _do_format_pinned_repos(nodes: list[dict], username: str | None) -> str:
+def _render_pinned_repos(nodes: list[dict], username: str | None) -> str:
     """Format repo nodes as Markdown."""
     if not nodes:
         prefix = f"**@{username}** " if username else ""
