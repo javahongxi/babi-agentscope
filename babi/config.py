@@ -7,6 +7,9 @@ Python configuration loaded from environment variables and .env files.
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
+
 
 class Settings(BaseSettings):
     """Application settings with environment variable support.
@@ -19,7 +22,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="babi_",
-        env_file=".env",
+        env_file=_ENV_FILE if _ENV_FILE.exists() else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
