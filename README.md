@@ -33,7 +33,8 @@ export TAVILY_API_KEY=your_tavily_api_key
 # 可选 — GitHub API 令牌（用于 GitHub 相关功能）
 export GITHUB_TOKEN=your_github_token
 
-# 可选 — Redis（用于 Web 模式会话持久化，默认 localhost:6379）
+# 必需（Web 模式）— Redis（用于 Web 模式会话持久化，默认 localhost:6379）
+# CLI 模式无需 Redis；Web 模式强依赖，启动前请确保 Redis 已运行
 # brew services start redis   # macOS 快速启动
 ```
 
@@ -82,8 +83,6 @@ babi-as --web --port 9000         # 指定端口
 ```
 
 打开浏览器访问 `http://localhost:8900`，即可在聊天界面中与 Babi Agent 交互。
-
-> Web 模式依赖 Redis，请确保本地 Redis 服务已启动。
 
 ## Skills 扩展
 
