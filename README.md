@@ -2,7 +2,7 @@
 
 面向开发者的 AI Coding Agent，基于 ReAct 模式提供代码分析、构建、调试等开发辅助能力。
 
-> 技术栈：AgentScope SDK + FastAPI + Click
+> 技术栈：AgentScope + FastAPI + Click
 
 ## 特性
 
