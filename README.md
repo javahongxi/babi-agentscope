@@ -21,8 +21,8 @@
 ## 环境准备
 
 ```bash
-# Python 3.10+
-python --version  # 确认版本 >= 3.10
+# Python 3.11+
+python --version  # 确认版本 >= 3.11
 
 # 阿里云百炼 API Key（必需）
 export DASHSCOPE_API_KEY=your_api_key

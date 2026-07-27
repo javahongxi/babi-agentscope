@@ -2,7 +2,7 @@
 name = "babi-agentscope"
 version = "1.0.0"
 description = "A coding agent application built with AgentScope"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "agentscope>=1.0",
     "fastapi>=0.115",
@@ -34,4 +34,4 @@ include = ["babi*"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
