@@ -38,8 +38,7 @@ class Settings(BaseSettings):
     workspace: str = "~/babi-agentscope-workspace"
 
     # --- Model ---
-    model_name: str = "qwen-plus"
-    fallback_model: str = "qwen-turbo"
+    model_name: str = "qwen3.8-max"
 
     # --- Agent ---
     max_iters: int = 20
