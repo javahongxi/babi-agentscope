@@ -35,6 +35,7 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
     # Import here to avoid circular imports and allow lazy loading
     from agentscope.agent import Agent
     from agentscope.agent._agent import AgentState
+    from agentscope.agent._config import ModelConfig
     from agentscope.credential import DashScopeCredential
     from agentscope.model import DashScopeChatModel
     from agentscope.permission import PermissionContext, PermissionMode
@@ -82,6 +83,17 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
     agent_state = AgentState(
         permission_context=PermissionContext(mode=PermissionMode.BYPASS),
     )
+
+    # Build the fallback model for when the primary model fails
+    fallback_model = DashScopeChatModel(
+        credential=DashScopeCredential(
+            api_key=settings.dashscope_api_key
+        ),
+        model=settings.fallback_model,
+        stream=True,
+        max_retries=settings.max_retries,
+    )
+
     agent = Agent(
         name=AGENT_NAME,
         system_prompt=sys_prompt,
@@ -95,9 +107,17 @@ def build_agent(settings: Settings, workspace_path: Path | None = None):
         ),
         toolkit=toolkit,
         state=agent_state,
+        model_config=ModelConfig(
+            fallback_model=fallback_model,
+            max_retries=settings.max_retries,
+        ),
     )
 
-    logger.info("BabiAgent built successfully with model: %s", settings.model_name)
+    logger.info(
+        "BabiAgent built successfully with model: %s, fallback: %s",
+        settings.model_name,
+        settings.fallback_model,
+    )
     return agent
 
 
